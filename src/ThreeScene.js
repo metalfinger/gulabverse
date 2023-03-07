@@ -385,7 +385,7 @@ function ThreeScene() {
 
     root.add(object6);
 
-    //function to add rotation on z axis to all objects
+    //function to add rotation on z axis to all objects Added to the scene
     function rotateAllObjects(object) {
       anime({
         targets: object.rotation,
