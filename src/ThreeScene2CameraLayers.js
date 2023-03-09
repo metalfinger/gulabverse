@@ -9,14 +9,19 @@ import { BloomPass } from "three/examples/jsm/postprocessing/BloomPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 //add ShaderPass
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+//add BlurPass
+// import { BlurPass } from "three/examples/jsm/postprocessing/BlurPass";
+
+import { BokehPass } from "three/examples/jsm/postprocessing/BokehPass";
 //add RimBasic from threejs-shader-materials
 import { RimBasicMaterial } from "threejs-shader-materials";
 //import Color from three
 import { Color } from "three";
 //import CopyShader from threejs
 import { CopyShader } from "three/examples/jsm/shaders/CopyShader.js";
+import { render } from "@testing-library/react";
 
-function ThreeScene() {
+function ThreeScene2CameraLayers() {
   const canvasRef = useRef();
 
   useEffect(() => {
@@ -44,6 +49,11 @@ function ThreeScene() {
     //   1000
     // );
 
+    //!Place Root
+    let defaultCameraPosition = new THREE.Vector3(20, -70, 30);
+
+    let defaultLookAtPosition = new THREE.Vector3(1.5, -1.5, 0);
+
     // Create an isometric camera
     let aspect = window.innerWidth / window.innerHeight;
     let defaultDistance = 5;
@@ -54,11 +64,10 @@ function ThreeScene() {
       d,
       -d,
       0.001,
-      1000
+      1000000
     );
-    camera.lookAt(scene.position); // or the origin
 
-    let d2 = defaultDistance + 1;
+    let d2 = defaultDistance;
 
     //add second camera
     let camera2 = new THREE.OrthographicCamera(
@@ -66,22 +75,22 @@ function ThreeScene() {
       d2 * aspect,
       d2,
       -d2,
-      0.001,
-      1000
+      0.00001,
+      1000000
     );
 
-    //create two render targets
-    let renderTarget = new THREE.WebGLRenderTarget(
-      window.innerWidth,
-      window.innerHeight
-    );
-    let renderTarget2 = new THREE.WebGLRenderTarget(
-      window.innerWidth / 2,
-      window.innerHeight / 2
+    //create mainCamera
+    let d3 = defaultDistance;
+
+    let mainCamera = new THREE.OrthographicCamera(
+      -d3 * aspect,
+      d3 * aspect,
+      d3,
+      -d3,
+      0.00001,
+      1000000
     );
 
-    //define variables for the default camera position
-    let defaultCameraPosition = new THREE.Vector3(0, 0, 20);
     // Position the camera to Default position
     camera.position.set(
       defaultCameraPosition.x,
@@ -89,16 +98,120 @@ function ThreeScene() {
       defaultCameraPosition.z
     );
 
+    camera.lookAt(
+      defaultLookAtPosition.x,
+      defaultLookAtPosition.y,
+      defaultLookAtPosition.z
+    );
+
+    //set camera layer
+    // camera.layers.set(1);
+
+    camera2.position.set(
+      defaultCameraPosition.x,
+      defaultCameraPosition.y,
+      defaultCameraPosition.z
+    );
+
+    camera2.lookAt(
+      defaultLookAtPosition.x,
+      defaultLookAtPosition.y,
+      defaultLookAtPosition.z
+    );
+
+    mainCamera.position.set(
+      defaultCameraPosition.x,
+      defaultCameraPosition.y,
+      defaultCameraPosition.z
+    );
+
+    mainCamera.lookAt(
+      defaultLookAtPosition.x,
+      defaultLookAtPosition.y,
+      defaultLookAtPosition.z
+    );
+
     //create a root object
     const root = new THREE.Object3D();
 
-    //create a base object
-    const base = new THREE.Object3D();
+    scene.add(root);
 
-    //add root to base
-    base.add(root);
+    //!Mesh Plane
+    //create two separate render targets for two cameras
+    const renderTarget1 = new THREE.WebGLRenderTarget(
+      window.innerWidth,
+      window.innerHeight
+    );
 
-    scene.add(base);
+    const renderTarget2 = new THREE.WebGLRenderTarget(
+      window.innerWidth,
+      window.innerHeight
+    );
+
+    // Create plane mesh to combine render targets
+    const materialShader = new THREE.ShaderMaterial({
+      uniforms: {
+        texture1: { value: renderTarget1.texture },
+        texture2: { value: renderTarget2.texture },
+        resolution: {
+          value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        },
+        //apply blurStrength
+        blurStrength: {
+          value: 0.0,
+        },
+      },
+      vertexShader: `
+        void main() {
+          gl_Position = vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D texture1;
+        uniform sampler2D texture2;
+        uniform vec2 resolution;
+        uniform float blurStrength;
+
+        // Function to apply Gaussian blur
+        vec4 blur(sampler2D mytexture, vec2 uv) {
+          vec4 color = vec4(0.0);
+          float sigma = 0.001 + blurStrength;
+          float blurSize = 2.0 * sigma;
+          float weightSum = 0.0;
+
+          for (float x = -blurSize; x <= blurSize; x += 1.0) {
+            for (float y = -blurSize; y <= blurSize; y += 1.0) {
+              vec2 offset = vec2(x, y);
+              float weight = exp(-(x*x + y*y) / (2.0 * sigma * sigma));
+              color += texture2D(mytexture, uv + offset / resolution.xy) * weight;
+              weightSum += weight;
+            }
+          }
+
+          return color / weightSum;
+        }
+
+        void main() {
+          //vec4 color1 = texture2D(texture1, gl_FragCoord.xy / resolution.xy);
+          vec4 color1 = blur(texture1, gl_FragCoord.xy / resolution.xy);
+          vec4 color2 = texture2D(texture2, gl_FragCoord.xy / resolution.xy);
+          
+          // Calculate the alpha value based on the red channel of texture2
+          float alpha = color2.a;
+
+          // Blend the two colors based on the alpha value
+          vec4 finalColor = mix(color1, color2, alpha);
+
+          gl_FragColor = finalColor;
+        }
+      `,
+    });
+
+    let mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), materialShader);
+    scene.add(mesh);
+    mesh.layers.set(3);
+
+    //!Object Set Code starts Here
 
     // Create a SphereGeometry and a MeshBasicMaterial
     const geometry = new THREE.SphereGeometry(1, 32, 32);
@@ -160,6 +273,9 @@ function ThreeScene() {
     let sun = new THREE.Mesh(geometrySun, sunMaterial);
     sun.scale.set(1, 1, 1);
     sun.position.set(0, 0, 0);
+
+    addToLayer1(sun);
+
     root.add(sun);
 
     //!Glow to Sun
@@ -208,6 +324,9 @@ function ThreeScene() {
     sunGlowInner.position.set(0, 0, 0);
 
     sunGlowInner.scale.multiplyScalar(1.0);
+
+    addToLayer1(sunGlowInner);
+
     root.add(sunGlowInner);
 
     const glowMaterialGlowOuter = new THREE.ShaderMaterial({
@@ -232,6 +351,9 @@ function ThreeScene() {
     sunGlowOuter.position.set(0, 0, 0);
 
     sunGlowOuter.scale.multiplyScalar(1.4);
+
+    addToLayer1(sunGlowOuter);
+
     root.add(sunGlowOuter);
 
     //!Object1
@@ -245,10 +367,16 @@ function ThreeScene() {
     };
 
     let angle = -0.77;
+    let angleX = (-20 * Math.PI) / 180;
+    let angleY = (-70 * Math.PI) / 180;
     let radius = 3.5;
 
     //set position of sphere1 on ring1 at angle 0
-    object1.position.set(radius * Math.cos(angle), radius * Math.sin(angle), 0);
+    object1.position.set(
+      radius * Math.cos(angleX) - 2,
+      radius * Math.sin(angleY),
+      0
+    );
 
     root.add(object1);
 
@@ -416,46 +544,189 @@ function ThreeScene() {
 
     root.add(object6);
 
-    //function to add rotation on z axis to all objects Added to the scene
-    function rotateAllObjects(object) {
-      anime({
-        targets: object.rotation,
-        z: 2 * Math.PI,
-        duration: 50000 * Math.random() + 10000,
-        easing: "linear",
-        loop: true,
-      });
-    }
-
-    //rotate all objects
-    rotateAllObjects(object1);
-    rotateAllObjects(object2);
-    rotateAllObjects(object3);
-    rotateAllObjects(object4);
-    rotateAllObjects(object5);
-    rotateAllObjects(object6);
-
     //!Dummy Object Starts Here
 
     //create dummy object
-    const dummyObject = object1.clone();
+    let dummyObject;
 
-    //add dummy object to scene
-    root.add(dummyObject);
-
-    //add animation to dummy object to rotate around center
-    anime({
-      targets: dummyObject.position,
+    //create a dummy object to animate camera2 lookat
+    let camera2LookAt = {
       x: 0,
       y: 0,
-      z: 10,
-      duration: 5000,
-      easing: "linear",
-    });
+      z: 0,
+    };
 
-    //!Dummy Object Ends Here
+    //create a dummy object to animate camera2 zoom
+    let camera2Zoom = { value: 1 };
 
-    //Add a light
+    //!Orth Animation Starts Here
+
+    //trigger after 2 seconds
+    setTimeout(function () {
+      zoomInOnObject(object1);
+    }, 2000);
+
+    setTimeout(function () {
+      zoomInOnObject(object2);
+    }, 8000);
+
+    //!zoomInOnObject
+    function zoomInOnObject(animatingObject) {
+      //null dummyObject reference
+      dummyObject = animatingObject.clone();
+
+      //remove animatingObject from its parent
+      root.remove(animatingObject);
+      scene.add(dummyObject);
+
+      //set layer of dummy object to layer 2
+      dummyObject.layers.set(2);
+
+      let animationTime = 2000;
+
+      //create a dummy object to animate camera2 zoom
+      camera2Zoom = { value: 1 };
+
+      //animate cameraZoom to 2 using anime
+      anime({
+        targets: camera2Zoom,
+        value: 5,
+        duration: animationTime,
+        easing: "linear",
+        update: function () {
+          aspect = window.innerWidth / window.innerHeight;
+
+          d2 = defaultDistance / camera2Zoom.value;
+
+          //update camera2 left, right, top, bottom
+          camera2.left = -d2 * aspect;
+          camera2.right = d2 * aspect;
+          camera2.top = d2;
+          camera2.bottom = -d2;
+
+          // console.log(camera2Zoom.value, d2, defaultDistance);
+
+          //update camera2 projection matrix
+          camera2.updateProjectionMatrix();
+        },
+      });
+
+      //get absolute position on screen of animatingObject
+      let object1GlobalPosition = animatingObject.getWorldPosition(
+        new THREE.Vector3(0, 0, 0)
+      );
+
+      //create vector and 1, 1, 0 to object1 position
+      let vector = new THREE.Vector3(
+        object1GlobalPosition.x + 1,
+        object1GlobalPosition.y + 0.2,
+        0
+      );
+
+      camera2LookAt.x = scene.position.x + defaultLookAtPosition.x;
+      camera2LookAt.y = scene.position.y + defaultLookAtPosition.y;
+      camera2LookAt.z = scene.position.z + defaultLookAtPosition.z;
+
+      // camera2.lookAt(camera2LookAt.x, camera2LookAt.y, camera2LookAt.z);
+
+      //animate camera2 lookat to object1 position using anime
+      anime({
+        targets: camera2LookAt,
+        x: vector.x,
+        y: vector.y,
+        z: vector.z,
+        duration: animationTime,
+        easing: "linear",
+        update: function () {
+          //update camera2 lookat
+          camera2.lookAt(camera2LookAt.x, camera2LookAt.y, camera2LookAt.z);
+        },
+      });
+
+      //animate materialShader's uniform blurStrength using anime
+      anime({
+        targets: materialShader.uniforms.blurStrength,
+        value: 6.5,
+        duration: animationTime,
+        easing: "linear",
+      });
+
+      //trigger after 3 seconds\
+      setTimeout(function () {
+        zoomOutFromObject(animatingObject);
+      }, 3000);
+    }
+
+    function zoomOutFromObject(animatingObject) {
+      let animationTime = 2000;
+
+      console.log(camera2Zoom.value, d2, defaultDistance, "PIVOT");
+
+      //animate cameraZoom to 2 using anime
+      anime({
+        targets: camera2Zoom,
+        value: 1,
+        duration: animationTime,
+        easing: "linear",
+        update: function () {
+          aspect = window.innerWidth / window.innerHeight;
+
+          d2 = defaultDistance / camera2Zoom.value;
+
+          // console.log(camera2Zoom.value, d2, defaultDistance);
+
+          //update camera2 left, right, top, bottom
+          camera2.left = -d2 * aspect;
+          camera2.right = d2 * aspect;
+          camera2.top = d2;
+          camera2.bottom = -d2;
+
+          // console.log(camera2Zoom.value);
+
+          //update camera2 projection matrix
+          camera2.updateProjectionMatrix();
+        },
+        complete: function () {
+          root.add(animatingObject);
+          scene.remove(dummyObject);
+
+          //make dummyObject null
+          dummyObject = null;
+        },
+      });
+
+      //animate camera2 lookat to object1 position using anime
+      anime({
+        targets: camera2LookAt,
+        x: defaultLookAtPosition.x,
+        y: defaultLookAtPosition.y,
+        z: defaultLookAtPosition.z,
+        duration: animationTime,
+        easing: "linear",
+        update: function () {
+          //update camera2 lookat
+          camera2.lookAt(camera2LookAt.x, camera2LookAt.y, camera2LookAt.z);
+        },
+      });
+
+      anime({
+        targets: materialShader.uniforms.blurStrength,
+        value: 0,
+        duration: animationTime,
+        easing: "linear",
+      });
+    }
+
+    addToLayer1(object1);
+    addToLayer1(object2);
+    addToLayer1(object3);
+    addToLayer1(object4);
+    addToLayer1(object5);
+    addToLayer1(object6);
+
+    //!Orth Animation Ends Here
+
+    //!Add a light
     const light = new THREE.PointLight(0xffffff, 1, 400);
     light.position.set(10, 0, 10);
     scene.add(light);
@@ -559,19 +830,17 @@ function ThreeScene() {
         ),
         ringMaterial
       );
-      // ring.rotation.y = Math.PI * 0.2;
-      // ring.rotation.x = Math.PI * 0.2;
 
       //if i is more than 2 then scale it
       if (i > 2) {
         ring.scale.set(1.2, 1, 1);
       }
 
+      addToLayer1(ring);
+
       rings.push(ring);
       root.add(rings[i]);
     }
-
-    //!Orbit Ends here
 
     //!Third Ring Astroid Starts here
 
@@ -610,6 +879,8 @@ function ThreeScene() {
       //set random scale
       astroid.scale.setScalar((Math.random() * 0.5 + 0.5) * 0.05);
 
+      addToLayer1(astroid);
+
       //add astroid to astroids array
       astroids.push(astroid);
 
@@ -627,6 +898,11 @@ function ThreeScene() {
     });
 
     //!Third Ring Astroid Ends here
+
+    //!function Add TO layer1
+    function addToLayer1(object) {
+      object.layers.set(1);
+    }
 
     //create GlowShader
     const GlowShader = {
@@ -669,82 +945,6 @@ function ThreeScene() {
     //variable to check if selected
     let zoomedIn = false;
 
-    // animateRoot();
-    // Check if clicked on sphere
-    function onClick(event) {
-      //prevent default action
-      event.preventDefault();
-
-      // Calculate mouse position in normalized device coordinates
-      // (-1 to +1) for both components
-      const mouse = new THREE.Vector2();
-      mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
-      mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
-
-      // Create a Raycaster
-      const raycaster = new THREE.Raycaster();
-
-      // Set the raycaster position
-      raycaster.setFromCamera(mouse, camera);
-
-      // Calculate objects intersecting the picking ray
-      const intersects = raycaster.intersectObjects(root.children, false);
-
-      if (intersects.length > 0) {
-        // console.log("Clicked on sphere", intersects[0].object);
-
-        //get the object that was clicked
-        const object = intersects[0].object;
-
-        // animateCameraToSphere(object);
-
-        clickedOnObject(object);
-      }
-    }
-
-    //function to focus on the objects
-    function clickedOnObject(object) {
-      //get attributes of the object
-      const objectAttributes = object.userData;
-
-      //if objectAttributes exists
-      if (objectAttributes.selected != undefined) {
-        console.log("====================================");
-        console.log(objectAttributes);
-        console.log("====================================");
-
-        //if the object is not selected
-        if (!objectAttributes.selected) {
-          //select the object
-          objectAttributes.selected = true;
-
-          //zoomed in
-          zoomedIn = true;
-
-          focusOnObject(object);
-        } else {
-          //deselect the object
-          objectAttributes.selected = false;
-
-          //zoomed out
-          zoomedIn = false;
-
-          //focus off the object
-          outOfFocusOnObject();
-        }
-
-        console.log("====================================");
-        console.log(objectAttributes);
-        console.log("====================================");
-      }
-    }
-
-    //when the mouse is clicked, call the onClick function
-    // window.addEventListener("click", onClick);
-
-    //when the mouse is clicked, call the onClick function
-    window.addEventListener("click", onClick);
-
     var mouseX = 0;
     var mouseY = 0;
 
@@ -754,197 +954,71 @@ function ThreeScene() {
       mouseY = event.clientY;
     });
 
-    //!Place Root
-    //convert to radians
-    let radiansY = (-20 * Math.PI) / 180; // - mouseX/10000;
-    let radiansX = (-70 * Math.PI) / 180; // - mouseY/10000;
+    // let composer = new EffectComposer(renderer);
 
-    //set rotation
-    // root.rotation.set(radiansX, radiansY, 0);
+    // // create a final composite pass to render both camera views using CopyShader
+    // const compositePass = new ShaderPass(CopyShader);
 
-    let defaultRootPosition = new THREE.Vector3(-2, 0, 0);
+    // //create a composer to handle multiple passes
+    // let composerMultiPass = new EffectComposer(renderer);
 
-    //set position
-    root.position.set(defaultRootPosition.x, defaultRootPosition.y, 0);
+    // //add the render pass to the composer with the scene and camera
+    // composerMultiPass.addPass(new RenderPass(scene, camera, renderTarget));
 
-    const target = new THREE.Object3D();
-    target.position.set(0, 0, d);
+    // //add the final pass to the composer with the scene and camera2
+    // composerMultiPass.addPass(new RenderPass(scene, camera2, renderTarget2));
 
-    //function to focus on the object
-    function focusOnObject(object) {
-      //get position of the object
-      const objectPosition = object.position;
+    // //add the final pass to the composer
+    // composerMultiPass.addPass(compositePass);
 
-      let animationTime = 2000;
+    // composer.render();
 
-      //set rotation of the root to 0, 0, 0 through anime
-      anime({
-        targets: root.rotation,
-        x: 0,
-        y: 0,
-        z: 0,
-        duration: animationTime,
-        easing: "easeInOutQuad",
-        complete: function () {},
-      });
+    //create two render targets
+    // const renderTarget = new THREE.WebGLRenderTarget(
+    //   window.innerWidth,
+    //   window.innerHeight
+    // );
 
-      //set position of the root through anime
-      anime({
-        targets: root.position,
-        x: -objectPosition.x - 0.7,
-        y: -objectPosition.y - 0.5,
-        z: 0,
-        duration: animationTime,
-        easing: "easeInOutQuad",
-        update: function () {
-          //update camera lookAt object1 position
-          // camera.lookAt(object.position);
-        },
-      });
+    // const renderTarget2 = new THREE.WebGLRenderTarget(
+    //   window.innerWidth,
+    //   window.innerHeight
+    // );
 
-      //zoom in on the object through orthographic camera
-      anime({
-        targets: target.position,
-        x: 0,
-        y: 0,
-        z: 0.5,
-        duration: animationTime,
-        easing: "easeInOutQuad",
-        update: function () {
-          //update d and orthographic camera left, right, top, bottom
-          d = target.position.z;
-          aspect = window.innerWidth / window.innerHeight;
+    //create two render passes with the render targets
+    // const renderPass = new RenderPass(scene, camera, object1);
+    // const renderPass2 = new RenderPass(scene, camera2, object2);
 
-          camera.left = -d * aspect;
-          camera.right = d * aspect;
-          camera.top = d;
-          camera.bottom = -d;
+    // //create a EffectComposer to handle multiple passes
+    // const composer = new EffectComposer(renderer);
 
-          //update camera lookAt object1 position
-          // camera.lookAt(object1.position);
-        },
-      });
+    // //add the render passes to the composer
+    // composer.addPass(renderPass);
+    // composer.addPass(renderPass2);
 
-      //for all rings
-      for (let i = 0; i < rings.length; i++) {
-        //get the ring
-        const ring = rings[i];
+    // //Render the two cameras to the same render target
+    // renderer.autoClear = false;
 
-        //get material of the ring
-        let material = ring.material;
+    // //enable layer1 and disable layer2
+    // camera.layers.enable(layer1);
+    // camera.layers.disable(layer2);
+    // //enable layer2 and disable layer1
+    // camera2.layers.disable(layer2);
+    // camera2.layers.enable(layer1);
 
-        //set the opacity of the material to 0 through anime
-        anime({
-          targets: material,
-          opacity: 0,
-          duration: animationTime,
-          easing: "easeInOutQuad",
-          update: function () {
-            //update the material
-            material.needsUpdate = true;
-          },
-        });
-      }
-    }
+    //!Blur the camera
+    const composer = new EffectComposer(renderer, renderTarget2);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
 
-    //function to go out of focus on the object
-    function outOfFocusOnObject() {
-      let animationTime = 2000;
-
-      //set rotation of the root to radiansX, radiansY, 0 through anime
-      anime({
-        targets: root.rotation,
-        x: radiansX,
-        y: radiansY,
-        z: 0,
-        duration: animationTime,
-        easing: "easeInOutQuad",
-        complete: function () {},
-      });
-
-      //set position of the root through anime
-      anime({
-        targets: root.position,
-        x: defaultRootPosition.x,
-        y: defaultRootPosition.y,
-        z: defaultRootPosition.z,
-        duration: animationTime,
-        easing: "easeInOutQuad",
-        update: function () {
-          //update camera lookAt object1 position
-          // camera.lookAt(object.position);
-        },
-      });
-
-      console.log("====================================");
-      console.log(
-        "defaultCameraPosition",
-        defaultCameraPosition,
-        target.position.z
-      );
-      console.log("====================================");
-
-      //zoom out on the object through orthographic camera
-      anime({
-        targets: target.position,
-        x: 0,
-        y: 0,
-        z: defaultDistance,
-        duration: animationTime,
-        easing: "easeInOutQuad",
-        update: function () {
-          //update d and orthographic camera left, right, top, bottom
-          d = target.position.z;
-          aspect = window.innerWidth / window.innerHeight;
-
-          camera.left = -d * aspect;
-          camera.right = d * aspect;
-          camera.top = d;
-          camera.bottom = -d;
-
-          //update camera lookAt object1 position
-          // camera.lookAt(object1.position);
-        },
-      });
-
-      //for all rings
-      for (let i = 0; i < rings.length; i++) {
-        //get the ring
-        const ring = rings[i];
-
-        //get material of the ring
-        let material = ring.material;
-
-        //set the opacity of the material to 0 through anime
-        anime({
-          targets: material,
-          opacity: 0.5,
-          duration: animationTime,
-          easing: "easeInOutQuad",
-          update: function () {
-            //update the material
-            material.needsUpdate = true;
-          },
-        });
-      }
-    }
-
-    let composer = new EffectComposer(renderer);
-
-    // create a final composite pass to render both camera views using CopyShader
-    const compositePass = new ShaderPass(CopyShader);
-
-    //create a composer to handle multiple passes
-    let composerMultiPass = new EffectComposer(renderer);
-
-    //add the render pass to the composer with the scene and camera
-    composerMultiPass.addPass(new RenderPass(scene, camera, renderTarget));
-
-    //add the final pass to the composer with the scene and camera2
-    composerMultiPass.addPass(new RenderPass(scene, camera2, renderTarget2));
-
-    //add the final pass to the composer
-    composerMultiPass.addPass(compositePass);
+    //add BlurPass
+    const blurPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.5,
+      0.4,
+      0.85
+    );
+    blurPass.renderToScreen = true;
+    composer.addPass(blurPass);
 
     composer.render();
 
@@ -952,24 +1026,34 @@ function ThreeScene() {
     function animate() {
       requestAnimationFrame(animate);
 
-      if (!zoomedIn) {
-        // camera.position.x += ( - mouseX/300 - camera.position.x ) * .05;
-        // camera.position.y += ( - mouseY/150 - camera.position.y ) * .05;
-        //rotate root around the y axis as much as the mouse moves on the x axis
-        // root.rotation.y += ( - mouseX/100000 - root.rotation.y ) * .05;
-        //rotate root around the x axis as much as the mouse moves on the y axis
-        // root.rotation.x += ( - mouseY/100000 - root.rotation.x ) * .05;
-        //camera look at the root
-        //camera.lookAt(root.position);
-        //change camera z position as window is resized
-        // camera.position.z = 40 - (window.innerWidth - 1000)/100;
-      }
+      //rotate scene
 
-      //update orthographic camera
-      camera.updateProjectionMatrix();
-
-      // Render the scene
+      // renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+      renderer.setRenderTarget(renderTarget1);
+      camera.layers.enable(0);
+      camera.layers.enable(1);
+      camera.layers.disable(2);
+      camera.layers.disable(3);
       renderer.render(scene, camera);
+
+      renderer.setRenderTarget(renderTarget2);
+      // renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+      camera2.layers.enable(0);
+      camera2.layers.disable(1);
+      camera2.layers.enable(2);
+      camera2.layers.disable(3);
+      renderer.render(scene, camera2);
+
+      renderer.setRenderTarget(null);
+      mainCamera.layers.disable(0);
+      mainCamera.layers.disable(1);
+      mainCamera.layers.disable(2);
+      mainCamera.layers.enable(3);
+
+      renderer.render(scene, mainCamera);
+
+      //Blur renderTarget1
+      // composer.render();
     }
 
     animate();
@@ -979,15 +1063,32 @@ function ThreeScene() {
       renderer.setSize(parent.clientWidth, parent.clientHeight);
       camera.aspect = parent.clientWidth / parent.clientHeight;
       camera.updateProjectionMatrix();
+      camera2.updateProjectionMatrix();
+      // mainCamera.updateProjectionMatrix();
 
       //update d and orthographic camera left, right, top, bottom
-      d = target.position.z;
       aspect = window.innerWidth / window.innerHeight;
 
       camera.left = -d * aspect;
       camera.right = d * aspect;
       camera.top = d;
       camera.bottom = -d;
+
+      // camera2.left = -d2 * aspect;
+      // camera2.right = d2 * aspect;
+      // camera2.top = d2;
+      // camera2.bottom = -d2;
+
+      // console.log(d, d2, d3, aspect);
+
+      // mainCamera.left = -d3 * aspect;
+      // mainCamera.right = d3 * aspect;
+      // mainCamera.top = d3;
+      // mainCamera.bottom = -d3;
+
+      //update uniforms of materialShader
+      // materialShader.uniform.resolution.value.x = parent.clientWidth;
+      // materialShader.uniform.resolution.value.y = parent.clientHeight;
     }
 
     window.addEventListener("resize", onResize);
@@ -1002,4 +1103,4 @@ function ThreeScene() {
   return <div ref={canvasRef} style={{ width: "100%", height: "100%" }} />;
 }
 
-export default ThreeScene;
+export default ThreeScene2CameraLayers;
