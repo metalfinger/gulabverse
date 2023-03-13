@@ -1,7 +1,7 @@
-import React, { Component } from 'react'
- 
-import { createShaderCanvas } from 'react-shader-canvas';
- 
+import React, { Component } from "react";
+
+import { createShaderCanvas } from "react-shader-canvas";
+
 const shader = (props) => `
 #ifdef GL_ES
 precision mediump float;
@@ -100,23 +100,20 @@ void main() {
 
     gl_FragColor = vec4(finalColor, 1.0);
 }
-`
- 
-const ShaderComponent = createShaderCanvas(shader)
- 
+`;
+
+const ShaderComponent = createShaderCanvas(shader);
+
 class MyShaderCanvas extends Component {
   state = {
-    timeSync: false
-  }
- 
-  updateState = (e) => this.setState(state => ({ timeSync: !state.timeSync }))
- 
-  render () {
-    return (
-      <div onClick={this.updateState}>
-        <ShaderComponent id="background" timeSync={this.state.timeSync} />
-      </div>
-    )
+    timeSync: false,
+  };
+
+  updateState = (e) =>
+    this.setState((state) => ({ timeSync: !state.timeSync }));
+
+  render() {
+    return <ShaderComponent id="background" timeSync={this.state.timeSync} />;
   }
 }
 

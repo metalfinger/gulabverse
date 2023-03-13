@@ -50,9 +50,11 @@ function ThreeScene2CameraLayers() {
     // );
 
     //!Place Root
-    let defaultCameraPosition = new THREE.Vector3(20, -70, 30);
+    // let defaultCameraPosition = new THREE.Vector3(20, -70, 30);
+    let defaultCameraPosition = new THREE.Vector3(0, 0, 20);
 
-    let defaultLookAtPosition = new THREE.Vector3(1.5, -1.5, 0);
+    // let defaultLookAtPosition = new THREE.Vector3(1.5, -1.5, 0);
+    let defaultLookAtPosition = new THREE.Vector3(0, 0, 0);
 
     // Create an isometric camera
     let aspect = window.innerWidth / window.innerHeight;
@@ -192,8 +194,8 @@ function ThreeScene2CameraLayers() {
         }
 
         void main() {
-          //vec4 color1 = texture2D(texture1, gl_FragCoord.xy / resolution.xy);
-          vec4 color1 = blur(texture1, gl_FragCoord.xy / resolution.xy);
+          vec4 color1 = texture2D(texture1, gl_FragCoord.xy / resolution.xy);
+          // vec4 color1 = blur(texture1, gl_FragCoord.xy / resolution.xy);
           vec4 color2 = texture2D(texture2, gl_FragCoord.xy / resolution.xy);
           
           // Calculate the alpha value based on the red channel of texture2
@@ -201,6 +203,8 @@ function ThreeScene2CameraLayers() {
 
           // Blend the two colors based on the alpha value
           vec4 finalColor = mix(color1, color2, alpha);
+
+          // finalColor = color1 + color2;
 
           gl_FragColor = finalColor;
         }
@@ -214,44 +218,37 @@ function ThreeScene2CameraLayers() {
     //!Object Set Code starts Here
 
     // Create a SphereGeometry and a MeshBasicMaterial
-    const geometry = new THREE.SphereGeometry(1, 32, 32);
+    let geometry = new THREE.SphereGeometry(1, 32, 32);
 
     //load noise1.jpg texture
     const textureLoader = new TextureLoader();
-    // const texture = textureLoader.load("/models/noise1.jpg");
+    const texture = textureLoader.load("/models/noise3.jpg");
 
     //load texture
-    const texture = textureLoader.load("/models/2k_venus_surface.jpg");
+    // const texture = textureLoader.load("/models/jamun__map.jpg");
 
     //create Lambert material with emissive color
     const materialLambert = new THREE.MeshLambertMaterial({
-      color: 0xbd3d18,
+      color: 0x932b11,
       map: texture,
     });
 
-    //set emissive color
-    materialLambert.emissive.setHex(0xd1441d);
-
-    //set emissive intensity
-    materialLambert.emissiveIntensity = 0.1;
-
+    // //set emissive color
+    // materialLambert.emissive.setHex(0x00ff00);
+    // //set emissive intensity
+    // materialLambert.emissiveIntensity = 0.0;
     //set shininess
-    materialLambert.shininess = 100;
-
-    //set reflectivity
-    materialLambert.reflectivity = 10.5;
-
+    // materialLambert.shininess = 20;
+    // //set reflectivity
+    materialLambert.reflectivity = 20;
     //set glow color
     materialLambert.glowColor = new THREE.Color(0x00ff00);
-
     //set glow intensity
-    materialLambert.glowIntensity = 1.5;
-
-    //set bump texture
-    materialLambert.bumpMap = texture;
-
-    //set bump scale
-    materialLambert.bumpScale = 0.0001;
+    materialLambert.glowIntensity = 10.5;
+    // //set bump texture
+    // materialLambert.bumpMap = texture;
+    // //set bump scale
+    // materialLambert.bumpScale = 0.0;
 
     //!Adding Objects to the scene Starts here
 
@@ -473,8 +470,325 @@ function ThreeScene2CameraLayers() {
     mat.transparent = true;
 
     //!Object3
-    const object3 = new THREE.Mesh(geometry, materialLambert);
-    object3.scale.set(0.5, 0.5, 0.5);
+
+    //create empty Object3Container
+    const object3Container = new THREE.Object3D();
+    root.add(object3Container);
+
+    //create a plane geometry
+    geometry = new THREE.PlaneGeometry(1, 1, 1);
+
+    //!Material for Object3 using Shaders
+    const vertexShader3 = `
+    varying vec2 vUv;
+    varying vec3 vNormal;
+
+    void main() {
+        vUv = uv;
+        vNormal = normal;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+`;
+
+    const fragmentShader3 = `
+    #ifdef GL_ES
+precision mediump float;
+#endif
+
+uniform float u_time;
+uniform vec2 u_resolution;
+
+#define MAX_STEPS 100
+#define MAX_DIST 100.
+#define SURF_DIST .01
+const float PI = 3.14159265359;
+
+float sdCylinder(vec3 p, vec3 a, vec3 b, float r) {
+  vec3 ap = p-a;
+  vec3 ab = b-a;
+
+  float t = dot(ap,ab)/dot(ab,ab);
+
+  vec3 c = a + t*ab;
+
+  float d = length(p-c) - r;
+
+  t = abs(t-0.5) - 0.5;
+
+  float y = t*length(ab);
+
+  float e = length(max(vec2(d,y),0.0));
+
+  float i = min(max(d, y), 0.);
+
+  return e+i;
+}
+
+float sBox(vec3 p, vec3 size)
+{
+    vec3 d = max(abs(p) - size, vec3(0.));
+    return length(d);
+}
+
+float sdTorus(vec3 p, vec2 r)
+{
+    return length(vec2(length(p.xz) - r.x, p.y)) - r.y;
+}
+
+float sdCapcule(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3 ap = p-a;
+    vec3 ab = b-a;
+
+    float t = dot(ap,ab)/dot(ab,ab);
+    t = clamp(t,0.,1.);
+
+    vec3 q = a + ab*t;
+    vec3 d = p-q;
+
+    return length(d)-r;
+    
+}
+
+mat2 rot2d(float a)
+{
+    float c = cos(a);
+    float s = sin(a);
+    return mat2(c,-s,s,c);
+}
+
+mat3 rot3d(vec3 a)
+{
+    float c = cos(a.x);
+    float s = sin(a.x);
+    float t = 1.0 - c;
+    return mat3(t*a.y*a.y + c,     t*a.x*a.y - s*a.z, t*a.x*a.z + s*a.y,
+                t*a.x*a.y + s*a.z, t*a.y*a.y + c,     t*a.y*a.z - s*a.x,
+                t*a.x*a.z - s*a.y, t*a.y*a.z + s*a.x, t*a.z*a.z + c);
+}
+
+float smin(float a, float b, float k)
+{
+    float h = clamp(0.5+0.5*(b-a)/k, 0.0, 1.0);
+    return mix(b, a, h) - k*h*(1.0-h);
+}
+
+float GetDist(vec3 p)
+{
+    vec4 s = vec4(0., 1., 3., 1.);
+    
+    float sphereDist = length(p-s.xyz) - s.w;
+
+    
+    return sphereDist;
+}
+
+
+
+float RayMarch(vec3 ro, vec3 rd) {
+	float dO=0.;
+    
+    for(int i=0; i<MAX_STEPS; i++) {
+    	vec3 p = ro + rd*dO;
+        float dS = GetDist(p);
+        dO += dS;
+        if(dO>MAX_DIST || dS<SURF_DIST) break;
+    }
+
+    
+    return dO;
+}
+
+
+
+vec3 GetNormal(vec3 p) {
+	float d = GetDist(p);
+    vec2 e = vec2(.001, 0);
+    
+    vec3 n = d - vec3(
+        GetDist(p-e.xyy),
+        GetDist(p-e.yxy),
+        GetDist(p-e.yyx));
+    
+    return normalize(n);
+}
+
+float GetLight(vec3 p) {
+    vec3 lightPos = vec3(0, 1, 0);
+    //lightPos.xz += vec2(sin(u_time), cos(u_time))*2.;
+    vec3 l = normalize(lightPos-p);
+    vec3 n = GetNormal(p);
+    
+    //start
+    // calculate specular contribution
+    vec3 r = reflect(-l, n);
+    vec3 v = normalize(-p);
+    float spec = pow(max(dot(r, v), 0.0), 32.0);
+    //end
+
+    float dif = clamp(dot(n, l), 0., 1.);
+    float d = RayMarch(p+n*SURF_DIST*2., l);
+    if(d<length(lightPos-p)) dif *= .1;
+    
+    // return spec*dif + dif;
+    return dif;
+}
+
+
+//function to create a glow rim around the object
+float GetRim(vec3 p, vec3 rd) {
+    vec3 n = GetNormal(p);
+    float rim = 1.1 - abs(dot(rd, n));
+    rim = pow(rim, 4.);
+    return rim;
+}
+
+float GetHalo(vec3 p, vec3 rd) {
+    vec3 n = GetNormal(p);
+    vec3 sphereCenter = vec3(0., 0., 9.);
+    float distFromSphere = length(p - sphereCenter) - 1.3;
+    float halo = smoothstep(1.0, 0.5, distFromSphere);
+    return halo;
+}
+
+float rimGlow(vec2 uv)
+{
+    float rad = 0.343;
+    float radW = 0.04; //bluriness at border
+    float ringWidth = 0.00001;
+
+    //create a circular rim at 0.1
+    float rim = smoothstep(rad, rad + radW, length(uv));
+
+    rad += ringWidth;
+
+    //create a circle at 0.2
+    float circle = smoothstep(rad, rad + radW, length(uv));
+
+    rim *= 1.0 - circle; //subtract the rim from the circle
+
+    rim = rim * 3.1;
+
+    return rim;
+}
+
+//hex color to rgb
+vec3 hex2rgb(vec3 c)
+{
+    return vec3(c.x/255., c.y/255., c.z/255.);
+}
+
+// 2D Random
+float random (in vec2 st) {
+    return fract(sin(dot(st.xy,
+                         vec2(12.9898,78.233)))
+                 * 43758.5453123);
+}
+
+float noise (in vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+
+    // Four corners in 2D of a tile
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+
+    // Smooth Interpolation
+    vec2 u = smoothstep(0.,1.,f);
+
+    // Mix 4 coorners percentages
+    return mix(a, b, u.x) +
+            (c - a)* u.y * (1.0 - u.x) +
+            (d - b) * u.x * u.y;
+}
+
+void main()
+{
+    vec2 uv = (gl_FragCoord.xy - .5*u_resolution)/u_resolution.y;  
+
+    vec3 col = vec3(0);
+    
+    vec3 ro = vec3(0, 1, 0.);
+    vec3 rd = normalize(vec3(uv.x, uv.y, 1.));
+
+    float d = RayMarch(ro, rd);
+    
+    vec3 p = ro + rd * d;
+
+
+    //unwrap uv for Sphere and create sphereUV
+    vec3 sphereCenter = vec3(0., 0., 9.);
+    vec3 sphereCoord = normalize(p - sphereCenter);
+    float longitude = atan(sphereCoord.z, sphereCoord.x);
+    float latitude = acos(sphereCoord.y);
+    vec2 sphereUV = vec2(longitude / (1.0 * PI) + 0.5 + u_time*0.01, latitude / PI);
+    // vec2 sphereUV = uv;
+
+
+    float noiseAmount = 0.3;
+    vec2 noiseST = sphereUV * 4000.0;
+
+    vec3 noiseColor = vec3(0.0);
+    noiseColor += noise(noiseST) * noiseAmount;
+
+    //get the rim
+    float rim = GetRim(p, rd);
+
+
+    //get the light
+    float dif = GetLight(p);
+
+    float halo = GetHalo(p, rd);
+
+    float glow = pow(rim, 4.)*4.;
+
+    dif = dif*(1. - noiseColor.x);
+
+    // add outer glow
+    col += vec3(181.0/255.0, 112.0/255.0, 35.0/255.0) * rim * 1.2;
+
+    col += vec3(187.0/255.0,
+                46.0/255.0, 
+                8.0/255.0) * dif * 1.1;
+
+    //mix the colors
+    // col = col * noiseColor.z;
+
+    //add rim glow
+    // float rimGlow = rimGlow(uv);
+
+    // col += vec3(1.0, 1.0, 1.0) * rimGlow * .2;
+
+    // gl_FragColor = vec4(col, dif + rimGlow + rim);
+    gl_FragColor = vec4(col, (dif + rim)*2.);
+    // gl_FragColor = vec4(col, 0.1);
+    
+    // gl_FragColor = vec4(col, 1.0);
+
+    // col = vec3(noiseColor);
+
+    // gl_FragColor = vec4(col, 1.0);
+}   
+`;
+
+    //create a material for object3
+    let materialLambert3 = new THREE.ShaderMaterial({
+      uniforms: {
+        u_time: { value: 0 },
+        u_resolution: { value: new THREE.Vector2() },
+      },
+      vertexShader: vertexShader3,
+      fragmentShader: fragmentShader3,
+      side: THREE.DoubleSide,
+    });
+
+    //set uniforms for object3
+    materialLambert3.uniforms.u_resolution.value.x = window.innerWidth;
+    materialLambert3.uniforms.u_resolution.value.y = window.innerHeight;
+
+    const object3 = new THREE.Mesh(geometry, materialLambert3);
 
     //add attributes to object3
     object3.userData = {
@@ -486,9 +800,60 @@ function ThreeScene2CameraLayers() {
     radius = 6;
 
     //set position of sphere1 on ring1 at angle 0
-    object3.position.set(radius * Math.cos(angle), radius * Math.sin(angle), 0);
+    object3Container.position.set(
+      radius * Math.cos(angle),
+      radius * Math.sin(angle),
+      0
+    );
 
-    root.add(object3);
+    //rotate object3
+    // object3Container.rotation.set(1.0, 0.5, 0.1);
+
+    object3Container.add(object3);
+
+    //!Object3 material Start
+    const glowMaterialGlowInner3 = new THREE.ShaderMaterial({
+      uniforms: {
+        c: { type: "f", value: 0.9 },
+        p: { type: "f", value: 2.2 },
+        baseColor: { type: "c", value: new THREE.Color(0xaaaaaa) },
+      },
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.FrontSide,
+    });
+    const glowMaterialGlowOuter3 = new THREE.ShaderMaterial({
+      uniforms: {
+        c: { type: "f", value: 0.1 },
+        p: { type: "f", value: 10.8 },
+        baseColor: { type: "c", value: new THREE.Color(0xffffff) },
+      },
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      side: THREE.BackSide,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.5,
+    });
+
+    let o3Inner = new THREE.Mesh(geometry.clone(), glowMaterialGlowInner3);
+    o3Inner.scale.multiplyScalar(1.0);
+
+    // addToLayer1(o3Inner);
+
+    object3Container.add(o3Inner);
+
+    let o3Outer = new THREE.Mesh(geometry.clone(), glowMaterialGlowOuter3);
+
+    o3Outer.scale.multiplyScalar(1.4);
+
+    // addToLayer1(o3Outer);
+
+    object3Container.add(o3Outer);
+    //!Object3 material Ends
 
     //!Object4
     const object4 = new THREE.Mesh(geometry, materialLambert);
@@ -561,14 +926,13 @@ function ThreeScene2CameraLayers() {
 
     //!Orth Animation Starts Here
 
-    //trigger after 2 seconds
-    setTimeout(function () {
-      zoomInOnObject(object1);
-    }, 2000);
+    // trigger after 2 seconds
+    setTimeout(function () {}, 2000);
+    // zoomInOnObject(object3Container);
 
-    setTimeout(function () {
-      zoomInOnObject(object2);
-    }, 8000);
+    // setTimeout(function () {
+    //   zoomInOnObject(object2);
+    // }, 8000);
 
     //!zoomInOnObject
     function zoomInOnObject(animatingObject) {
@@ -651,10 +1015,10 @@ function ThreeScene2CameraLayers() {
         easing: "linear",
       });
 
-      //trigger after 3 seconds\
-      setTimeout(function () {
-        zoomOutFromObject(animatingObject);
-      }, 3000);
+      // //trigger after 3 seconds\
+      // setTimeout(function () {
+      //   zoomOutFromObject(animatingObject);
+      // }, 3000);
     }
 
     function zoomOutFromObject(animatingObject) {
@@ -728,11 +1092,11 @@ function ThreeScene2CameraLayers() {
 
     //!Add a light
     const light = new THREE.PointLight(0xffffff, 1, 400);
-    light.position.set(10, 0, 10);
-    scene.add(light);
+    light.position.set(0, 0, 0);
+    // scene.add(light);
 
     //Add point light
-    const pointLight = new THREE.PointLight(0xffffff, 3, 2000);
+    const pointLight = new THREE.PointLight(0xffffff, 1.2, 500);
     pointLight.position.set(0, 0, 0);
     root.add(pointLight);
 
@@ -740,44 +1104,52 @@ function ThreeScene2CameraLayers() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     root.add(ambientLight);
 
-    //! GLTF starts here
+    // //! GLTF starts here
 
     // //load texture from models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/Ledikeni_Camera 1_1_a.jpg
     // const textureLoaderGLTF = new TextureLoader();
     // const textureGLTF = textureLoaderGLTF.load(
-    //   '/models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/Ledikeni_Camera 1_1_a.jpg'
+    //   "/models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/Ledikeni_Camera 1_1_a.jpg"
     // );
 
     // //load oclussion texture from models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/A_Ledikeni_Camera 1_1_a.jpg
     // const textureLoaderOclussionGLTF = new TextureLoader();
     // const textureOclussionGLTF = textureLoaderOclussionGLTF.load(
-    //   '/models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/A_Ledikeni_Camera 1_1_a.jpg'
+    //   "/models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/A_Ledikeni_Camera 1_1_a.jpg"
     // );
 
     // //create Lambert material with emissive color with texture and oclussion texture
-    // const materialGLTF = new THREE.MeshLambertMaterial({ map: textureGLTF, aoMap: textureOclussionGLTF});
+    // const materialGLTF = new THREE.MeshLambertMaterial({
+    //   map: textureGLTF,
+    //   aoMap: textureOclussionGLTF,
+    // });
 
     // // Load the GLTF model and its texture
     // const loader = new GLTFLoader();
 
-    // loader.load('/models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/Ledikeni.gltf', function (gltf) {
-    //   gltf.scene.traverse(function (child) {
-    //     if (child.isMesh) {
-    //       child.material = materialGLTF;
-    //       // Set material color
-    //       //child.material.color.setHex(0xffff00);
+    // loader.load(
+    //   "/models/DessertRoz-Gulab Jamun-20230306T191815Z-001/DessertRoz-Gulab Jamun/Ledikeni.gltf",
+    //   function (gltf) {
+    //     gltf.scene.traverse(function (child) {
+    //       if (child.isMesh) {
+    //         child.material = materialGLTF;
+    //         // Set material color
+    //         //child.material.color.setHex(0xffff00);
+    //       }
+    //     });
+    //     root.add(gltf.scene);
+    //     //set scale of GLTF model
+    //     gltf.scene.scale.set(0.005, 0.005, 0.005);
 
-    //     }
-    //   });
-    //   root.add(gltf.scene);
-    //   //set scale of GLTF model
-    //   gltf.scene.scale.set(0.002, 0.002, 0.002);
+    //     //set layer of GLTF model
+    //     gltf.scene.layers.set(0);
 
-    //   //set position of GLTF model
-    //   gltf.scene.position.set(1, 0, 0);
-    // });
+    //     //set position of GLTF model
+    //     gltf.scene.position.set(1, 0, 0);
+    //   }
+    // );
 
-    //! GLTF ENds here
+    // //! GLTF ENds here
 
     //!Orbit Starts here
 
@@ -839,7 +1211,7 @@ function ThreeScene2CameraLayers() {
       addToLayer1(ring);
 
       rings.push(ring);
-      root.add(rings[i]);
+      // root.add(rings[i]);
     }
 
     //!Third Ring Astroid Starts here
@@ -1032,8 +1404,8 @@ function ThreeScene2CameraLayers() {
       renderer.setRenderTarget(renderTarget1);
       camera.layers.enable(0);
       camera.layers.enable(1);
-      camera.layers.disable(2);
-      camera.layers.disable(3);
+      camera.layers.enable(2);
+      camera.layers.enable(3);
       renderer.render(scene, camera);
 
       renderer.setRenderTarget(renderTarget2);

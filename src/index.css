@@ -1,30 +1,84 @@
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
 
-.canvasholder {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-canvas{
+#background {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   z-index: 1;
+}
+
+.galaxy {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100vh;
+
+  /*set flex and centered*/
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1vh;
+
+  overflow: hidden;
+}
+
+.planet {
+  position: absolute;
+  z-index: 2;
+  /* add transition to 1 seconds with ease */
+  transition: 2s ease;
+}
+
+.planet3 {
+  width: 20em;
+  height: 20em;
+  left: calc(50vw - 40em);
+  top: calc(50vh - 30em);
+}
+
+.planet1 {
+  width: 10em;
+  height: 10em;
+  left: calc(50vw + 10em);
+  top: calc(50vh - 10em);
+}
+
+.planet5 {
+  width: 10em;
+  height: 10em;
+  left: calc(50vw + 20em);
+  top: calc(50vh + 10em);
+}
+
+.planet6 {
+  width: 15em;
+  height: 15em;
+  left: calc(50vw + 40em);
+  top: calc(50vh - 10em);
+}
+
+.selectedplanet {
+  width: 120em;
+  height: 120em;
+  left: -20vw;
+  top: calc(40em);
+}
+
+.shaderCanvas {
+  width: 100% !important;
+  height: 100% !important;
 }
