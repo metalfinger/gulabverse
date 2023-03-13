@@ -258,8 +258,8 @@ void main()
 function Planet3() {
   //useState function
   const [lightposition, setLightposition] = useState({
-    x: 2.5,
-    y: 2,
+    x: 4.5,
+    y: 1.8,
     z: -1,
     outerglow: 0.0,
   });
@@ -269,7 +269,7 @@ function Planet3() {
 
   let savePosition = {
     x: 2.5,
-    y: 2,
+    y: 1.8,
     z: -1,
     outerglow: 0.0,
   };
@@ -303,7 +303,7 @@ function Planet3() {
       z: 1.5,
       outerglow: 1,
       //ease in out
-      ease: "power2.inOut",
+      // ease: "power2.inOut",
       onUpdate: () => {
         setLightposition((prev) => ({
           x: localPosition.x,
@@ -351,7 +351,7 @@ function Planet3() {
       z: savePosition.z,
       outerglow: savePosition.outerglow,
       //ease in out
-      ease: "power2.inOut",
+      // ease: "power2.inOut",
       onUpdate: () => {
         setLightposition((prev) => ({
           x: localPosition.x,

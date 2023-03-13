@@ -267,7 +267,7 @@ function Planet1() {
       z: 0.5,
       outerglow: 1.0,
       //ease in out
-      ease: "power2.inOut",
+      // ease: "power2.inOut",
       onUpdate: () => {
         setLightposition((prev) => ({
           x: localPosition.x,
@@ -312,7 +312,7 @@ function Planet1() {
       y: savePosition.y,
       z: savePosition.z,
       //ease in out
-      ease: "power2.inOut",
+      // ease: "power2.inOut",
       onUpdate: () => {
         setLightposition((prev) => ({
           x: localPosition.x,

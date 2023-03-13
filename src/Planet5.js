@@ -298,12 +298,12 @@ function Planet5() {
 
     const tl = gsap.to(localPosition, {
       duration: 1.5,
-      x: 6,
+      x: 2,
       y: 5,
       z: 1.5,
       outerglow: 1,
       //ease in out
-      ease: "power2.inOut",
+      // ease: "power2.inOut",
       onUpdate: () => {
         setLightposition((prev) => ({
           x: localPosition.x,
@@ -348,7 +348,7 @@ function Planet5() {
       y: savePosition.y,
       z: savePosition.z,
       //ease in out
-      ease: "power2.inOut",
+      // ease: "power2.inOut",
       onUpdate: () => {
         setLightposition((prev) => ({
           x: localPosition.x,

@@ -89,10 +89,10 @@ void main() {
     vec3 color1 = vec3(0, 0, 0)/255.0;
     vec3 color2 = vec3(0, 0, 0)/255.0;
     vec3 color3 = vec3(216, 69, 27)/255.0;
-    vec3 color4 = vec3(216, 69, 27)/255.0;
+    vec3 color4 = vec3(0, 0, 0)/255.0;
 
 
-    vec3 finalColor = mix(mix(mix(color4, color3, n2), color2, n1), color1, n);
+    vec3 finalColor = mix(mix(mix(color4, color3, n2/2.0), color2, n1), color1, n);
 
     
 
