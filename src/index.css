@@ -43,6 +43,20 @@ code {
   transition: 2s ease;
 }
 
+.planet1 {
+  width: 10em;
+  height: 10em;
+  left: calc(50vw);
+  top: calc(50vh);
+}
+
+.planet2 {
+  width: 10em;
+  height: 10em;
+  left: calc(50vw + 10em);
+  top: calc(50vh - 10em);
+}
+
 .planet3 {
   width: 20em;
   height: 20em;
@@ -50,11 +64,11 @@ code {
   top: calc(50vh - 30em);
 }
 
-.planet1 {
-  width: 10em;
-  height: 10em;
-  left: calc(50vw + 10em);
-  top: calc(50vh - 10em);
+.planet4 {
+  width: 14em;
+  height: 14em;
+  left: calc(50vw + 30em);
+  top: calc(50vh - 20em);
 }
 
 .planet5 {
